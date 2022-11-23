@@ -9,8 +9,6 @@ from itertools import combinations
 from collections import defaultdict, Counter
 from motif import extract_motif_features
 import pickle
-from sklearn.metrics import precision_recall_fscore_support
-from sklearn.model_selection import train_test_split
 from sklearn.utils import resample
 from sklearn.feature_selection import SelectKBest
 epsilon = 1e-8
@@ -32,10 +30,6 @@ def train(dataloader, args, logger):
     models = (model1, model2)
     evaluate(models, dataloader, logger)
 
-    # X_train2 = SequentialFeatureSelector(model2, n_features_to_select=4).fit_transform(X_train2, y_train2)
-    # with open('train_objs.pkl', 'wb') as f:
-    #     pickle.dump({'X_train': dataloader.X_train, 'y_train': dataloader.y_train, 'nmc': dataloader.get_num_max_candidates('train')}, f)
-
 
 def evaluate(models, dataloader, logger):
 
@@ -52,18 +46,6 @@ def evaluate(models, dataloader, logger):
     if X_test[num_max_cliques_test:].shape[0] > 0:
         y_hat_test2 = model2.predict(X_test[num_max_cliques_test:])
     y_hat_test = np.hstack((y_hat_test1, y_hat_test2))
-
-    max_cliques_train, max_cliques_test = dataloader.get_num_max_candidates('train'), dataloader.get_num_max_candidates('test')
-
-    # precision_in, recall_in, f1_in, _ = precision_recall_fscore_support(y_test[:max_cliques_test], y_hat_test[:max_cliques_test], average='binary')
-    # logger.info('Performance w.r.t. finalized cliques max cliques test: precision {:.4f}, recall {:.4f}, f1 {:.4f}'.format(precision_in, recall_in, f1_in))
-    # precision_in, recall_in, f1_in, _ = precision_recall_fscore_support(y_test[:max_cliques_test],
-    #                                                                     np.ones_like(y_test[:max_cliques_test]), average='binary')
-    # logger.info('Performance w.r.t. finalized cliques max cliques test all ones: precision {:.4f}, recall {:.4f}, f1 {:.4f}'.format(precision_in, recall_in, f1_in))
-    # precision_in, recall_in, f1_in, _ = precision_recall_fscore_support(y_test[max_cliques_test:], y_hat_test[max_cliques_test:], average='binary')
-    # logger.info('Performance w.r.t. finalized cliques children test: precision {:.4f}, recall {:.4f}, f1 {:.4f}'.format(precision_in, recall_in, f1_in))
-    # precision_in, recall_in, f1_in, _ = precision_recall_fscore_support(y_test[max_cliques_test:], np.ones_like(y_test[max_cliques_test:]), average='binary')
-    # logger.info('Performance w.r.t. finalized cliques children test all ones: pprecision {:.4f}, recall {:.4f}, f1 {:.4f}'.format(precision_in, recall_in, f1_in))
     reconstructed_cliques = set(clique for pred, clique in zip(y_hat_test, dataloader.cliques['final_cliques_test']) if pred > 0.5)
     precision, recall, f1, jaccard = get_performance_wrt_ground_truth(reconstructed_cliques, dataloader.graphs['simplicies_test'])
     logger.info('Our Performance: precision {:.4f}, recall {:.4f}, f1 {:.4f} jaccard {:.4f}'.format(precision, recall, f1, jaccard))
@@ -93,21 +75,6 @@ def evaluate(models, dataloader, logger):
     communities_kclique, best_k = community.get_kclique_communities(dataloader.graphs['G_test'], dataloader.graphs['G_test'], dataloader.graphs['simplicies_train'])
     precision, recall, f1, jaccard = get_performance_wrt_ground_truth(communities_kclique, dataloader.graphs['simplicies_test'])
     logger.info('Baseline: CFinder (k={}) precision {:.4f}, recall {:.4f}, f1 {:.4f}, jaccard {:.4f} '.format(best_k, precision, recall, f1, jaccard))
-
-    fname = 'data/{}/reconstructions.pkl'.format(dataloader.args.dataset)
-    reconstructions = {}
-    if os.path.exists(fname):
-        with open(fname, 'rb') as f:
-            reconstructions = pickle.load(f)
-    with open(fname, 'wb') as f:
-        reconstructions.update({'Beyesian-MDL': beyesian_cliques,
-                                'Max Cliques': dataloader.cliques['max_cliques_test'],
-                                'Demon': communities_demon,
-                                'CFinder': communities_kclique,
-                                'Clique Covering': ecc_covering,
-                                'SHyRe-{}'.format(dataloader.args.features): reconstructed_cliques,
-                                'Ground Truth': dataloader.graphs['simplicies_test']})
-        pickle.dump(reconstructions, f)
 
 
 def get_performance_wrt_ground_truth(reconstructed, ground_truth):
@@ -163,7 +130,6 @@ class DataLoader:
         nested_candidates = candidates_ - max_candidates
         final_cliques = list(max_candidates) + list(nested_candidates)
 
-        # final_cliques = list(self.cliques['max_cliques_{}'.format(mode)]) + list(child2parents.keys()) # note that this must be a list
         node_degree = self.get_node_degree(mode)
 
         if self.args.features == 'count':
@@ -209,13 +175,6 @@ class DataLoader:
             X = self.extend_features(X, final_cliques, child2parents, mode)
         split = self.get_num_max_candidates(mode)
         X= (X - X.mean(axis=0, keepdims=True)) / (X.std(axis=0, keepdims=True) + epsilon)  # normalize
-        # X[:split] = (X[:split] - X[:split].mean(axis=0, keepdims=True)) / (X[:split].std(axis=0, keepdims=True) + epsilon)  # normalize
-        # X[split:] = (X[split:] - X[split:].mean(axis=0, keepdims=True)) / (X[split:].std(axis=0, keepdims=True) + epsilon)  # normalize
-
-        # (for baseline) extract features for each node as well
-        # node_features = np.zeros(shape=(len(node_degree), 4))
-        # for i in range(node_features.shape[0]):
-        #     node_features[i, :] = [node_degree[i], node_degree_recur[i], node_degree2[i], cluster_coef[i]]
         node_degree_arr = np.zeros(len(node_degree))
         for i in range(len(node_degree_arr)):
             node_degree_arr[i] = node_degree[i]
@@ -305,10 +264,6 @@ class DataLoader:
         num_max_cliques_train = self.get_num_max_candidates('train')
         X_train1, y_train1 = self.X_train[:num_max_cliques_train], self.y_train[:num_max_cliques_train]
         X_train2, y_train2 = self.X_train[num_max_cliques_train:], self.y_train[num_max_cliques_train:]
-        # if self.args.setting == 's':
-        #     # TODO: support gnn training
-        #     X_train1, _, y_train1, _ = train_test_split(X_train1, y_train1, train_size=0.1, random_state=self.args.seed, stratify=y_train1)
-        #     X_train2, _, y_train2, _ = train_test_split(X_train2, y_train2, train_size=0.1,  random_state=self.args.seed, stratify=y_train2)
         upsampled = False
         if upsampled:
             return self.upsample(X_train1, y_train1), self.upsample(X_train2, y_train2)
