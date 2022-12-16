@@ -6,9 +6,9 @@ Anonymous Authors
 * DBLP: https://www.cs.cornell.edu/~arb/data/coauth-DBLP/ (we use 2016 as training, 2015 as query)
 * P.School: https://www.cs.cornell.edu/~arb/data/contact-primary-school/
 * H.School: https://www.cs.cornell.edu/~arb/data/contact-high-school/
-* Foursquare: https://networks.skewed.de/net/foursquare (the `net2m_2002-05-01` collection)
+* Foursquare: https://networks.skewed.de/net/foursquare (the `NYC_restaurant_checkin` collection)
 * Hosts-Virus: https://zenodo.org/record/807517#.YgSOoerMJdg (the `data/associations.csv` file)
-* Directors: https://networks.skewed.de/net/board_directors (the `NYC_restaurant_checkin` collection)
+* Directors: https://networks.skewed.de/net/board_directors (the `net2m_2002-05-01` collection)
 * Crimes: https://networks.skewed.de/net/crime 
 
 We have processed all data from the sources and put them in `data/`. Notice that the P.School dataset is put in (and renamed) `school`, the H.School dataset is put in (and renamed) `school2`.
